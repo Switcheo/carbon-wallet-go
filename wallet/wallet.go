@@ -30,7 +30,6 @@ const (
 	BroadcastModeAsync = BroadcastMode("async")
 	BroadcastModeSync  = BroadcastMode("sync")
 	BroadcastModeBlock = BroadcastMode("block")
-	MainPrefix         = "tswth" // TODO: make this a proper config
 )
 
 // BroadcastMode - async, sync and block are only supported
@@ -120,17 +119,17 @@ func (w *Wallet) CreateAndSignTx(msgs []sdktypes.Msg) (tx authsigning.Tx, err er
 	}
 
 	// Second round: all signer infos are set, so each signer can sign.
-		signerData := authsigning.SignerData{
-			ChainID:       w.ChainID,
-			AccountNumber: acc.GetAccountNumber(),
-			Sequence:      acc.GetSequence(),
-		}
-		sigV2, err = clienttx.SignWithPrivKey(
-			txConfig.SignModeHandler().DefaultMode(), signerData,
-			txBuilder, w.PrivKey, txConfig, acc.GetSequence())
-		if err != nil {
-			return nil, err
-		}
+	signerData := authsigning.SignerData{
+		ChainID:       w.ChainID,
+		AccountNumber: acc.GetAccountNumber(),
+		Sequence:      acc.GetSequence(),
+	}
+	sigV2, err = clienttx.SignWithPrivKey(
+		txConfig.SignModeHandler().DefaultMode(), signerData,
+		txBuilder, w.PrivKey, txConfig, acc.GetSequence())
+	if err != nil {
+		return nil, err
+	}
 
 	err = txBuilder.SetSignatures(sigV2)
 
