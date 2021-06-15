@@ -1,0 +1,9 @@
+vue/node_modules
+vue/dist
+vue/src/store/generated
+secret.yml
+.idea
+.env
+
+# for generating proto typescript files
+/gen
