@@ -11,7 +11,7 @@ import (
 // grpcConn, _ := getGRPCConnection("127.0.0.1:9090")
 // defer grpcConn.Close()
 func GetGRPCConnection(targetGRPCAddress string) (*grpc.ClientConn, error) {
-	log.Info("Obtaining gRPC connection from: ", targetGRPCAddress)
+	// log.Info("Obtaining gRPC connection from: ", targetGRPCAddress)
 	// Create a connection to the gRPC server.
 	grpcConn, err := grpc.Dial(
 		targetGRPCAddress, // your gRPC server address.

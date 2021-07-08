@@ -18,26 +18,6 @@ import (
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 )
 
-// ConnectSubAccountWallet connect to a sub account wallet
-func ConnectSubAccountWallet(targetGRPCAddress string, subAccountLabel string, password string, mainPrefix string) *wallet.Wallet {
-	subWallet := ConnectCliWallet(targetGRPCAddress, subAccountLabel, password, mainPrefix)
-
-	for {
-		power, err := api.GetSubAccountPower(targetGRPCAddress, subWallet.AccAddress())
-
-		if err != nil || power.IsZero() {
-			log.Warnln("Failed subaccount request or zero voting power, will try again in a while:", err)
-			time.Sleep(time.Second * 3) // polling interval
-			continue
-		}
-
-		break
-	}
-
-	log.Warnln("connected subaccount: ", subAccountLabel)
-	return &subWallet
-}
-
 // ConnectCliWallet connect to a cli wallet
 func ConnectCliWallet(targetGRPCAddress string, label string, password string, mainPrefix string) (wallet wallet.Wallet) {
 	for {

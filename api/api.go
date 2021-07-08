@@ -2,14 +2,14 @@ package api
 
 import (
 	"context"
-	subaccounttypes "github.com/Switcheo/carbon/x/subaccount/types"
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
-	sdk "github.com/cosmos/cosmos-sdk/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	log "github.com/sirupsen/logrus"
 )
 
-// GetAccount gets an account from
+// APIs in this file is added in a "if we need it, then we add it basis"
+
+// GetAccount gets an account from its bech32 address
 func GetAccount(targetGRPCAddress string, bech32Address string)  (account *authtypes.BaseAccount, err error)  {
 	grpcConn, err := GetGRPCConnection(targetGRPCAddress)
 	if err != nil {
@@ -17,7 +17,7 @@ func GetAccount(targetGRPCAddress string, bech32Address string)  (account *autht
 	}
 	defer grpcConn.Close()
 
-	log.Info("Getting account: ", bech32Address)
+	//log.Info("Getting account: ", bech32Address)
 
 	// This creates a gRPC client to query the x/account service.
 	authClient := authtypes.NewQueryClient(grpcConn)
@@ -39,7 +39,7 @@ func GetAccount(targetGRPCAddress string, bech32Address string)  (account *autht
 		return
 	}
 
-	log.Infof("Found Account. Address: %s, AccountNumber: %d, Sequence: %d", ba.Address, ba.AccountNumber, ba.Sequence)
+	//log.Infof("Found Account. Address: %s, AccountNumber: %d, Sequence: %d", ba.Address, ba.AccountNumber, ba.Sequence)
 
 	return &ba, nil
 }
@@ -66,36 +66,4 @@ func GetChainID(targetGRPCAddress string) (chainID string, err error) {
 
 	log.Info("node info: ", nodeInfoRes.DefaultNodeInfo)
 	return nodeInfoRes.DefaultNodeInfo.Network, nil
-}
-
-// GetSubAccountPower get subaccount power
-// TODO: NYI, requires power endpoint for grpc query on stargate
-func GetSubAccountPower(targetGRPCAddress string, subAddress sdk.AccAddress) (*sdk.Int, error) {
-	grpcConn, err := GetGRPCConnection(targetGRPCAddress)
-	if err != nil {
-		return nil, err
-	}
-	defer grpcConn.Close()
-
-	log.Info("Getting subaccount: ", subAddress)
-
-	// This creates a gRPC client to query the subaccount
-	subaccountClient := subaccounttypes.NewQueryClient(grpcConn)
-	subAccountRes, err := subaccountClient.SubAccount(
-		context.Background(),
-		&subaccounttypes.QueryGetSubAccountRequest{
-			SubAccount: subAddress.String(),
-		},
-	)
-	if err != nil {
-		log.Error(err)
-		return nil, err
-	}
-
-	sa := subAccountRes.GetSubAccount()
-
-	log.Info("NYI: ", sa)
-	//log.Infof("Found Account. Address: %s, AccountNumber: %d, Sequence: %d", sa., ba.AccountNumber, ba.Sequence)
-
-	return nil, nil
 }

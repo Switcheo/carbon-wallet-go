@@ -3,8 +3,8 @@ package wallet
 import (
 	"context"
 	"fmt"
-	"github.com/Switcheo/carbon/common/utils"
-	"github.com/Switcheo/carbon/constants"
+	"github.com/Switcheo/carbon-wallet-go/utils"
+	"github.com/Switcheo/carbon-wallet-go/constants"
 	"github.com/cosmos/cosmos-sdk/client"
 	clienttx "github.com/cosmos/cosmos-sdk/client/tx"
 	"github.com/cosmos/cosmos-sdk/codec"
