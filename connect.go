@@ -77,6 +77,7 @@ func ConnectWallet(targetGRPCAddress string, privKey cmcryptotypes.PrivKey, labe
 		PrivKey:         privKey,
 		PubKey:          pubKey,
 		Bech32Addr:      bech32Addr,
+		MainPrefix:      mainPrefix,
 		DefaultGas:      wallet.DefaultGas,
 		MsgQueue:        make(chan wallet.MsgQueueItem, 10),
 		ResponseChannel: make(chan wallet.SubmitMsgResponse, 100),

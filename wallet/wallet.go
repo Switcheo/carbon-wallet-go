@@ -56,6 +56,7 @@ type Wallet struct {
 	PrivKey         cmcryptotypes.PrivKey
 	PubKey          cmcryptotypes.PubKey
 	Bech32Addr      string
+	MainPrefix      string
 	DefaultGas      uint64
 	GRPCURL         string
 	MsgQueue        chan MsgQueueItem
