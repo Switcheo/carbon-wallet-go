@@ -170,12 +170,15 @@ func (w *Wallet) BroadcastTx(tx authsigning.Tx, mode BroadcastMode) (txResp *sdk
 	grpcRes, err := txClient.BroadcastTx(
 		context.Background(),
 		&txtypes.BroadcastTxRequest{
-			Mode:    txtypes.BroadcastMode_BROADCAST_MODE_SYNC,
+			Mode:    txtypes.BroadcastMode_BROADCAST_MODE_BLOCK,
 			TxBytes: txBytes, // Proto-binary of the signed transaction, see previous step.
 		},
 	)
+	if grpcRes != nil && grpcRes.TxResponse != nil && grpcRes.TxResponse.Code != 0 {
+		log.Infof("grpcRes non-zero code: %+v\n", grpcRes)
+	}
 	if err != nil {
-		log.Info(err)
+		log.Infof("err: %+v\n", err)
 		return nil, err
 	}
 
