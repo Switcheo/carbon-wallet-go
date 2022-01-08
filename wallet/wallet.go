@@ -97,7 +97,7 @@ func (w *Wallet) CreateAndSignTx(msgs []sdktypes.Msg) (tx authsigning.Tx, err er
 		Amount: feeAmount,
 	}
 	txBuilder.SetFeeAmount(feeCoins)
-	txBuilder.SetTimeoutHeight(2000000)
+	// txBuilder.SetTimeoutHeight(2000000)
 	txBuilder.SetGasLimit(feeAmount.Uint64())
 
 	// Adapted from: https://docs.cosmos.network/master/run-node/txs.html#broadcasting-a-transaction-3
