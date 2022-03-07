@@ -3,8 +3,11 @@ package wallet
 import (
 	"context"
 	"fmt"
-	"github.com/Switcheo/carbon-wallet-go/utils"
+	"strings"
+	"time"
+
 	"github.com/Switcheo/carbon-wallet-go/constants"
+	"github.com/Switcheo/carbon-wallet-go/utils"
 	"github.com/cosmos/cosmos-sdk/client"
 	clienttx "github.com/cosmos/cosmos-sdk/client/tx"
 	"github.com/cosmos/cosmos-sdk/codec"
@@ -14,8 +17,6 @@ import (
 	txtypes "github.com/cosmos/cosmos-sdk/types/tx"
 	signingtypes "github.com/cosmos/cosmos-sdk/types/tx/signing"
 	authtxtypes "github.com/cosmos/cosmos-sdk/x/auth/tx"
-	"strings"
-	"time"
 
 	"github.com/Switcheo/carbon-wallet-go/api"
 	sdktypes "github.com/cosmos/cosmos-sdk/types"
@@ -51,17 +52,18 @@ type MsgQueueItem struct {
 
 // Wallet - used to submit tx
 type Wallet struct {
-	AccountNumber   uint64
-	ChainID         string
-	PrivKey         cmcryptotypes.PrivKey
-	PubKey          cmcryptotypes.PubKey
-	Bech32Addr      string
-	MainPrefix      string
-	DefaultGas      uint64
-	GRPCURL         string
-	MsgQueue        chan MsgQueueItem
-	ResponseChannel chan SubmitMsgResponse
-	StopChannel     chan int
+	AccountNumber    uint64
+	ChainID          string
+	PrivKey          cmcryptotypes.PrivKey
+	PubKey           cmcryptotypes.PubKey
+	Bech32Addr       string
+	MainPrefix       string
+	DefaultGas       uint64
+	GRPCURL          string
+	MsgFlushInterval time.Duration
+	MsgQueue         chan MsgQueueItem
+	ResponseChannel  chan SubmitMsgResponse
+	StopChannel      chan int
 }
 
 // AccAddress -
@@ -97,7 +99,6 @@ func (w *Wallet) CreateAndSignTx(msgs []sdktypes.Msg) (tx authsigning.Tx, err er
 		Amount: feeAmount,
 	}
 	txBuilder.SetFeeAmount(feeCoins)
-	// txBuilder.SetTimeoutHeight(2000000)
 	txBuilder.SetGasLimit(feeAmount.Uint64())
 
 	// Adapted from: https://docs.cosmos.network/master/run-node/txs.html#broadcasting-a-transaction-3
@@ -133,6 +134,9 @@ func (w *Wallet) CreateAndSignTx(msgs []sdktypes.Msg) (tx authsigning.Tx, err er
 	}
 
 	err = txBuilder.SetSignatures(sigV2)
+	if err != nil {
+		return nil, err
+	}
 
 	return txBuilder.GetTx(), nil
 }
@@ -222,7 +226,6 @@ func (w *Wallet) ProcessMsgQueue() {
 			msgs = append(msgs, item.Msg)
 			continue
 		default:
-			break
 		}
 		break
 	}
@@ -277,8 +280,12 @@ func (w *Wallet) RunProcessMsgQueue() {
 		case <-w.StopChannel:
 			return
 		default:
+			interval := w.MsgFlushInterval
+			if interval == 0 {
+				interval = 100 * time.Millisecond
+			}
+			time.Sleep(interval)
 			w.ProcessMsgQueue()
-			time.Sleep(100 * time.Millisecond)
 		}
 	}
 }
