@@ -1,12 +1,13 @@
 package carbonwalletgo
 
 import (
-	"github.com/cosmos/cosmos-sdk/crypto/keyring"
-	"github.com/cosmos/cosmos-sdk/version"
 	"os"
 	"path"
 	"strings"
 	"time"
+
+	"github.com/cosmos/cosmos-sdk/crypto/keyring"
+	"github.com/cosmos/cosmos-sdk/version"
 
 	"github.com/Switcheo/carbon-wallet-go/api"
 	"github.com/Switcheo/carbon-wallet-go/wallet"
@@ -18,8 +19,36 @@ import (
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 )
 
+type WalletConfig struct {
+	// The time to wait between sending out the messages in the async message queue
+	// as a single txn.
+	MsgFlushInterval time.Duration
+	// Message queue buffer length for async messages - if messages have not been flushed
+	// (through MsgFlushInterval) before the buffer is full, new msgs will block.
+	MsgQueueLength int64
+	// Response channel length for sync messages - if channel is not read before the
+	// buffer is full, new responses will block.
+	ResponseChannelLength int64
+}
+
+func NewWalletConfig(msgFlushInterval time.Duration, msgQueueLength int64, responseChannelLength int64) *WalletConfig {
+	return &WalletConfig{
+		MsgFlushInterval:      msgFlushInterval,
+		MsgQueueLength:        msgQueueLength,
+		ResponseChannelLength: responseChannelLength,
+	}
+}
+
+func DefaultWalletConfig() *WalletConfig {
+	return &WalletConfig{
+		MsgFlushInterval:      100 * time.Millisecond,
+		MsgQueueLength:        10,
+		ResponseChannelLength: 100,
+	}
+}
+
 // ConnectCliWallet connect to a cli wallet
-func ConnectCliWallet(targetGRPCAddress string, label string, password string, mainPrefix string) (wallet wallet.Wallet) {
+func ConnectCliWallet(targetGRPCAddress string, label string, password string, mainPrefix string, config *WalletConfig) (wallet wallet.Wallet) {
 	for {
 		chainID, err := api.GetChainID(targetGRPCAddress)
 		if err != nil {
@@ -35,7 +64,7 @@ func ConnectCliWallet(targetGRPCAddress string, label string, password string, m
 			continue
 		}
 
-		wallet, err = ConnectWallet(targetGRPCAddress, privKey, label, chainID, mainPrefix)
+		wallet, err = ConnectWallet(targetGRPCAddress, privKey, label, chainID, mainPrefix, config)
 		if err != nil {
 			log.Warnln(label, ": could not connect to wallet, will try again in a while", err.Error())
 			time.Sleep(time.Second * 3) // polling interval
@@ -49,7 +78,7 @@ func ConnectCliWallet(targetGRPCAddress string, label string, password string, m
 }
 
 // ConnectWallet - inits wallet
-func ConnectWallet(targetGRPCAddress string, privKey cmcryptotypes.PrivKey, label string, chainID string, mainPrefix string) (w wallet.Wallet, err error) {
+func ConnectWallet(targetGRPCAddress string, privKey cmcryptotypes.PrivKey, label string, chainID string, mainPrefix string, config *WalletConfig) (w wallet.Wallet, err error) {
 	pubKey := privKey.PubKey()
 	bech32Addr, err := bech32.ConvertAndEncode(mainPrefix, pubKey.Address())
 	if err != nil {
@@ -60,7 +89,7 @@ func ConnectWallet(targetGRPCAddress string, privKey cmcryptotypes.PrivKey, labe
 		if strings.Contains(err.Error(), "connect: connection refused") {
 			log.Info("connection refused, retrying...")
 			time.Sleep(100 * time.Millisecond)
-			return ConnectWallet(targetGRPCAddress, privKey, label, chainID, mainPrefix)
+			return ConnectWallet(targetGRPCAddress, privKey, label, chainID, mainPrefix, config)
 		}
 		return
 	}
@@ -68,21 +97,26 @@ func ConnectWallet(targetGRPCAddress string, privKey cmcryptotypes.PrivKey, labe
 	if account.AccountNumber == 0 {
 		log.Info("account not yet setup, will retry in a while...")
 		time.Sleep(1000 * time.Millisecond)
-		return ConnectWallet(targetGRPCAddress, privKey, label, chainID, mainPrefix)
+		return ConnectWallet(targetGRPCAddress, privKey, label, chainID, mainPrefix, config)
+	}
+
+	if config == nil {
+		config = DefaultWalletConfig()
 	}
 
 	w = wallet.Wallet{
-		AccountNumber:   account.AccountNumber,
-		ChainID:         chainID,
-		PrivKey:         privKey,
-		PubKey:          pubKey,
-		Bech32Addr:      bech32Addr,
-		MainPrefix:      mainPrefix,
-		DefaultGas:      wallet.DefaultGas,
-		MsgQueue:        make(chan wallet.MsgQueueItem, 10),
-		ResponseChannel: make(chan wallet.SubmitMsgResponse, 100),
-		StopChannel:     make(chan int, 10),
-		GRPCURL:         targetGRPCAddress,
+		AccountNumber:    account.AccountNumber,
+		ChainID:          chainID,
+		PrivKey:          privKey,
+		PubKey:           pubKey,
+		Bech32Addr:       bech32Addr,
+		MainPrefix:       mainPrefix,
+		DefaultGas:       wallet.DefaultGas,
+		GRPCURL:          targetGRPCAddress,
+		MsgFlushInterval: config.MsgFlushInterval,
+		MsgQueue:         make(chan wallet.MsgQueueItem, config.MsgQueueLength),
+		ResponseChannel:  make(chan wallet.SubmitMsgResponse, config.ResponseChannelLength),
+		StopChannel:      make(chan int, 3),
 	}
 
 	go w.RunProcessMsgQueue()
