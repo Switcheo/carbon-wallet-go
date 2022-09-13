@@ -29,6 +29,9 @@ type WalletConfig struct {
 	// Response channel length for sync messages - if channel is not read before the
 	// buffer is full, new responses will block.
 	ResponseChannelLength int64
+	// ConfirmTransaction channel length for sync messages - if channel is not read before the
+	// buffer is full, new responses will block.
+	ConfirmTransactionChannelLength int64
 }
 
 func NewWalletConfig(msgFlushInterval time.Duration, msgQueueLength int64, responseChannelLength int64) *WalletConfig {
@@ -41,9 +44,10 @@ func NewWalletConfig(msgFlushInterval time.Duration, msgQueueLength int64, respo
 
 func DefaultWalletConfig() *WalletConfig {
 	return &WalletConfig{
-		MsgFlushInterval:      100 * time.Millisecond,
-		MsgQueueLength:        10,
-		ResponseChannelLength: 100,
+		MsgFlushInterval:                100 * time.Millisecond,
+		MsgQueueLength:                  10,
+		ResponseChannelLength:           100,
+		ConfirmTransactionChannelLength: 100,
 	}
 }
 
@@ -105,21 +109,23 @@ func ConnectWallet(targetGRPCAddress string, privKey cmcryptotypes.PrivKey, labe
 	}
 
 	w = wallet.Wallet{
-		AccountNumber:    account.AccountNumber,
-		ChainID:          chainID,
-		PrivKey:          privKey,
-		PubKey:           pubKey,
-		Bech32Addr:       bech32Addr,
-		MainPrefix:       mainPrefix,
-		DefaultGas:       wallet.DefaultGas,
-		GRPCURL:          targetGRPCAddress,
-		MsgFlushInterval: config.MsgFlushInterval,
-		MsgQueue:         make(chan wallet.MsgQueueItem, config.MsgQueueLength),
-		ResponseChannel:  make(chan wallet.SubmitMsgResponse, config.ResponseChannelLength),
-		StopChannel:      make(chan int, 3),
+		AccountNumber:             account.AccountNumber,
+		ChainID:                   chainID,
+		PrivKey:                   privKey,
+		PubKey:                    pubKey,
+		Bech32Addr:                bech32Addr,
+		MainPrefix:                mainPrefix,
+		DefaultGas:                wallet.DefaultGas,
+		GRPCURL:                   targetGRPCAddress,
+		MsgFlushInterval:          config.MsgFlushInterval,
+		MsgQueue:                  make(chan wallet.MsgQueueItem, config.MsgQueueLength),
+		ResponseChannel:           make(chan wallet.SubmitMsgResponse, config.ResponseChannelLength),
+		StopChannel:               make(chan int, 3),
+		ConfirmTransactionChannel: make(chan wallet.TxHash, config.ConfirmTransactionChannelLength),
 	}
 
 	go w.RunProcessMsgQueue()
+	go w.RunConfirmTransactionHash()
 
 	return
 }
