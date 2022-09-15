@@ -6,6 +6,7 @@ require (
 	github.com/cosmos/cosmos-sdk v0.42.4
 	github.com/google/uuid v1.2.0
 	github.com/sirupsen/logrus v1.8.1
+	golang.org/x/time v0.0.0-20220722155302-e5dcc9cfc0b9
 	google.golang.org/grpc v1.42.0
 )
 

@@ -3,6 +3,7 @@ package wallet
 import (
 	"context"
 	"fmt"
+	"golang.org/x/time/rate"
 	"strings"
 	"time"
 
@@ -64,6 +65,9 @@ type Wallet struct {
 	Bech32Addr                 string
 	MainPrefix                 string
 	DefaultGas                 uint64
+	TxTimeoutHeight            int64
+	CurrentBlockHeight         int64
+	UpdateBlockHeightLimiter   *rate.Limiter
 	GRPCURL                    string
 	MsgFlushInterval           time.Duration
 	MsgQueue                   chan MsgQueueItem
@@ -109,6 +113,11 @@ func (w *Wallet) CreateAndSignTx(msgs []sdktypes.Msg) (tx authsigning.Tx, err er
 	txBuilder.SetFeeAmount(feeCoins)
 	txBuilder.SetGasLimit(feeAmount.Uint64())
 
+	if w.TxTimeoutHeight != 0 {
+		timeoutHeight := w.GetCurrentBlockHeight() + w.TxTimeoutHeight
+		txBuilder.SetTimeoutHeight(uint64(timeoutHeight))
+	}
+
 	// Adapted from: https://docs.cosmos.network/master/run-node/txs.html#broadcasting-a-transaction-3
 
 	// First round: we gather all the signer infos. We use the "set empty
@@ -147,6 +156,26 @@ func (w *Wallet) CreateAndSignTx(msgs []sdktypes.Msg) (tx authsigning.Tx, err er
 	}
 
 	return txBuilder.GetTx(), nil
+}
+
+// UpdateBlockHeight updates the block height using rate limiter to update CurrentBlockHeight
+// CurrentBlockHeight is used to calculate tx.TimeoutHeight
+func (w *Wallet) UpdateBlockHeight() {
+	if !w.UpdateBlockHeightLimiter.Allow() {
+		return
+	}
+
+	blockHeight, err := api.GetLatestBlockHeight(w.GRPCURL)
+	if err != nil {
+		panic("unable to get latest block height of chain")
+	}
+	w.CurrentBlockHeight = blockHeight
+}
+
+// GetCurrentBlockHeight calls UpdateBlockHeight before returning CurrentBlockHeight
+func (w *Wallet) GetCurrentBlockHeight() int64 {
+	w.UpdateBlockHeight()
+	return w.CurrentBlockHeight
 }
 
 // BroadcastTx - broadcasts a tx via grpc

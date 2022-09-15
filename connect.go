@@ -1,6 +1,7 @@
 package carbonwalletgo
 
 import (
+	"golang.org/x/time/rate"
 	"os"
 	"path"
 	"strings"
@@ -20,6 +21,11 @@ import (
 )
 
 type WalletConfig struct {
+	// Tx timeout height before the transaction is not considered valid by the blockchain
+	// set to 0 if you do not want tx to timeout
+	TxTimeoutHeight int64
+	// Update Block Height throttle duration
+	UpdateBlockHeightLimit time.Duration
 	// The time to wait between sending out the messages in the async message queue
 	// as a single txn.
 	MsgFlushInterval time.Duration
@@ -34,16 +40,10 @@ type WalletConfig struct {
 	ConfirmTransactionChannelLength int64
 }
 
-func NewWalletConfig(msgFlushInterval time.Duration, msgQueueLength int64, responseChannelLength int64) *WalletConfig {
-	return &WalletConfig{
-		MsgFlushInterval:      msgFlushInterval,
-		MsgQueueLength:        msgQueueLength,
-		ResponseChannelLength: responseChannelLength,
-	}
-}
-
 func DefaultWalletConfig() *WalletConfig {
 	return &WalletConfig{
+		TxTimeoutHeight:                 30, // MainNet ~1min
+		UpdateBlockHeightLimit:          5 * time.Second,
 		MsgFlushInterval:                100 * time.Millisecond,
 		MsgQueueLength:                  10,
 		ResponseChannelLength:           100,
@@ -116,6 +116,8 @@ func ConnectWallet(targetGRPCAddress string, privKey cmcryptotypes.PrivKey, labe
 		Bech32Addr:                bech32Addr,
 		MainPrefix:                mainPrefix,
 		DefaultGas:                wallet.DefaultGas,
+		TxTimeoutHeight:           config.TxTimeoutHeight,
+		UpdateBlockHeightLimiter:  rate.NewLimiter(rate.Every(config.UpdateBlockHeightLimit), 1),
 		GRPCURL:                   targetGRPCAddress,
 		MsgFlushInterval:          config.MsgFlushInterval,
 		MsgQueue:                  make(chan wallet.MsgQueueItem, config.MsgQueueLength),
@@ -123,6 +125,8 @@ func ConnectWallet(targetGRPCAddress string, privKey cmcryptotypes.PrivKey, labe
 		StopChannel:               make(chan int, 3),
 		ConfirmTransactionChannel: make(chan wallet.TxHash, config.ConfirmTransactionChannelLength),
 	}
+
+	w.UpdateBlockHeight()
 
 	go w.RunProcessMsgQueue()
 	go w.RunConfirmTransactionHash()

@@ -2,6 +2,8 @@ package api
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	log "github.com/sirupsen/logrus"
@@ -10,7 +12,7 @@ import (
 // APIs in this file is added in a "if we need it, then we add it basis"
 
 // GetAccount gets an account from its bech32 address
-func GetAccount(targetGRPCAddress string, bech32Address string)  (account *authtypes.BaseAccount, err error)  {
+func GetAccount(targetGRPCAddress string, bech32Address string) (account *authtypes.BaseAccount, err error) {
 	grpcConn, err := GetGRPCConnection(targetGRPCAddress)
 	if err != nil {
 		return nil, err
@@ -44,7 +46,6 @@ func GetAccount(targetGRPCAddress string, bech32Address string)  (account *autht
 	return &ba, nil
 }
 
-
 // GetChainID of the node from tendermint grpc
 func GetChainID(targetGRPCAddress string) (chainID string, err error) {
 	grpcConn, err := GetGRPCConnection(targetGRPCAddress)
@@ -66,4 +67,31 @@ func GetChainID(targetGRPCAddress string) (chainID string, err error) {
 
 	log.Info("node info: ", nodeInfoRes.DefaultNodeInfo)
 	return nodeInfoRes.DefaultNodeInfo.Network, nil
+}
+
+// GetLatestBlockHeight of the node from tendermint grpc
+func GetLatestBlockHeight(targetGRPCAddress string) (height int64, err error) {
+	grpcConn, err := GetGRPCConnection(targetGRPCAddress)
+	if err != nil {
+		return 0, err
+	}
+	defer grpcConn.Close()
+
+	serviceClient := tmservice.NewServiceClient(grpcConn)
+	lastestBlockRes, err := serviceClient.GetLatestBlock(
+		context.Background(),
+		&tmservice.GetLatestBlockRequest{},
+	)
+	height = lastestBlockRes.Block.Header.Height
+	if err != nil {
+		log.Error(err)
+		return 0, err
+	}
+	if height <= 0 {
+		err = errors.New(fmt.Sprintf("get latest block height is invalid: %+v\n", height))
+		log.Error(err)
+		return 0, err
+	}
+
+	return height, nil
 }
