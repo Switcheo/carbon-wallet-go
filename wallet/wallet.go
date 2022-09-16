@@ -52,30 +52,31 @@ type MsgQueueItem struct {
 }
 
 type TxHash struct {
-	Hash      string
-	CreatedAt time.Time
+	Hash       string
+	CreatedAt  time.Time
+	RetryCount uint
 }
 
 // Wallet - used to submit tx
 type Wallet struct {
-	AccountNumber              uint64
-	ChainID                    string
-	PrivKey                    cmcryptotypes.PrivKey
-	PubKey                     cmcryptotypes.PubKey
-	Bech32Addr                 string
-	MainPrefix                 string
-	DefaultGas                 uint64
-	TxTimeoutHeight            int64
-	CurrentBlockHeight         int64
-	UpdateBlockHeightLimiter   *rate.Limiter
-	GRPCURL                    string
-	MsgFlushInterval           time.Duration
-	MsgQueue                   chan MsgQueueItem
-	ResponseChannel            chan SubmitMsgResponse
-	StopChannel                chan int
-	ConfirmTransactionChannel  chan TxHash
-	ConfirmTransactionInterval time.Duration
-	ConfirmTransactionTimeout  time.Duration
+	AccountNumber                 uint64
+	ChainID                       string
+	PrivKey                       cmcryptotypes.PrivKey
+	PubKey                        cmcryptotypes.PubKey
+	Bech32Addr                    string
+	MainPrefix                    string
+	DefaultGas                    uint64
+	TxTimeoutHeight               int64
+	CurrentBlockHeight            int64
+	UpdateBlockHeightLimiter      *rate.Limiter
+	GRPCURL                       string
+	MsgFlushInterval              time.Duration
+	MsgQueue                      chan MsgQueueItem
+	ResponseChannel               chan SubmitMsgResponse
+	StopChannel                   chan int
+	ConfirmTransactionChannel     chan TxHash
+	ConfirmTransactionMinInterval time.Duration
+	ConfirmTransactionTimeout     time.Duration
 }
 
 // AccAddress -
@@ -217,7 +218,7 @@ func (w *Wallet) BroadcastTx(tx authsigning.Tx, mode BroadcastMode) (txResp *sdk
 	)
 	txHash := grpcRes.TxResponse.TxHash
 	log.Info("Broadcasted tx hash: ", txHash)
-	w.ConfirmTransactionChannel <- TxHash{Hash: grpcRes.TxResponse.TxHash, CreatedAt: time.Now()}
+	w.ConfirmTransactionChannel <- TxHash{Hash: grpcRes.TxResponse.TxHash, CreatedAt: time.Now(), RetryCount: 0}
 	if err != nil {
 		log.Info(err)
 		return nil, err
@@ -326,61 +327,6 @@ func (w *Wallet) RunProcessMsgQueue() {
 			}
 			time.Sleep(interval)
 			w.ProcessMsgQueue()
-		}
-	}
-}
-
-// RetryConfirmTransaction drops retry if txHash was created since timeout,
-// otherwise sends txHash to ConfirmTransactionChannel
-func (w *Wallet) RetryConfirmTransaction(txHash TxHash) {
-	timeout := w.ConfirmTransactionTimeout
-	if timeout == 0 {
-		timeout = 5 * time.Minute
-	}
-	if time.Now().After(txHash.CreatedAt.Add(timeout)) {
-		log.Errorf("RetryConfirmTransaction timeout for %+v", txHash.Hash)
-		return
-	}
-	interval := w.ConfirmTransactionInterval
-	if interval == 0 {
-		interval = 5 * time.Second
-	}
-	time.Sleep(interval)
-	w.ConfirmTransactionChannel <- txHash
-}
-
-// RunConfirmTransactionHash confirms the transaction has been completed in the blockchain
-func (w *Wallet) RunConfirmTransactionHash() {
-	for {
-		select {
-		case <-w.StopChannel:
-			return
-		case txHash := <-w.ConfirmTransactionChannel:
-			go func() {
-				grpcConn, err := api.GetGRPCConnection(w.GRPCURL)
-				if err != nil {
-					go w.RetryConfirmTransaction(txHash)
-					log.Error("unable to open grpcConn")
-				}
-				defer grpcConn.Close()
-
-				txClient := txtypes.NewServiceClient(grpcConn)
-				grpcRes, err := txClient.GetTx(context.Background(), &txtypes.GetTxRequest{Hash: txHash.Hash})
-				if err != nil {
-					go w.RetryConfirmTransaction(txHash)
-					if !strings.Contains(err.Error(), "code = NotFound") {
-						log.Errorf("ProcessTransactionHash.GetTx failed: %+v\n", err.Error())
-					}
-					return
-				}
-
-				response := grpcRes.TxResponse
-				if response.Code == 0 {
-					log.Infof("Transaction succeeded: %+v", response.TxHash)
-				} else {
-					log.Errorf("Transaction failed: txHash: %+v, code: %+v, raw_log: %+v\n", response.TxHash, response.Code, response.RawLog)
-				}
-			}()
 		}
 	}
 }
