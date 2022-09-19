@@ -216,13 +216,20 @@ func (w *Wallet) BroadcastTx(tx authsigning.Tx, mode BroadcastMode) (txResp *sdk
 			TxBytes: txBytes, // Proto-binary of the signed transaction, see previous step.
 		},
 	)
+	if err != nil {
+		log.Error(err)
+		return grpcRes.TxResponse, err
+	}
+
+	if grpcRes.TxResponse.Code != 0 {
+		err = fmt.Errorf("Broadcast failed with code: %+v, raw_log: %+v\n", grpcRes.TxResponse.Code, grpcRes.TxResponse.RawLog)
+		log.Error(err)
+		return grpcRes.TxResponse, err
+	}
+
 	txHash := grpcRes.TxResponse.TxHash
 	log.Info("Broadcasted tx hash: ", txHash)
 	w.ConfirmTransactionChannel <- TxHash{Hash: grpcRes.TxResponse.TxHash, CreatedAt: time.Now(), RetryCount: 0}
-	if err != nil {
-		log.Info(err)
-		return nil, err
-	}
 
 	return grpcRes.TxResponse, nil
 }
@@ -283,20 +290,17 @@ func (w *Wallet) ProcessMsgQueue() {
 		return
 	}
 
+	var responseErr error
 	response, err := w.BroadcastTx(tx, BroadcastModeBlock)
-	if err != nil || response.Code != 0 {
-		errFull := fmt.Errorf("submit msg failed: %d, %v", response.Code, response.RawLog)
-		if err != nil {
-			errFull = fmt.Errorf("%v, %v", errFull, err.Error())
-		}
-		for _, item := range items {
-			w.EnqueueMsgResponse(item, response, errFull)
-		}
-		return
+	if err != nil {
+		responseErr = err
+	}
+	if response != nil && response.Code != 0 {
+		responseErr = fmt.Errorf("submit msg failed: err: %v, code: %d, raw_log: %v\n", err, response.Code, response.RawLog)
 	}
 
 	for _, item := range items {
-		w.EnqueueMsgResponse(item, response, nil)
+		w.EnqueueMsgResponse(item, response, responseErr)
 	}
 }
 
