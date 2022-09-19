@@ -45,7 +45,7 @@ func DefaultWalletConfig() *WalletConfig {
 		TxTimeoutHeight:                 30, // MainNet ~1min
 		UpdateBlockHeightLimit:          5 * time.Second,
 		MsgFlushInterval:                100 * time.Millisecond,
-		MsgQueueLength:                  10,
+		MsgQueueLength:                  1000,
 		ResponseChannelLength:           100,
 		ConfirmTransactionChannelLength: 100,
 	}
