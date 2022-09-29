@@ -60,6 +60,7 @@ type TxHash struct {
 // Wallet - used to submit tx
 type Wallet struct {
 	AccountNumber                 uint64
+	AccountSequence               uint64
 	ChainID                       string
 	PrivKey                       cmcryptotypes.PrivKey
 	PubKey                        cmcryptotypes.PubKey
@@ -84,18 +85,18 @@ func (w *Wallet) AccAddress() sdktypes.AccAddress {
 	return sdktypes.AccAddress(w.PubKey.Address())
 }
 
+func (w *Wallet) IncrementAccountSequence() {
+	w.AccountSequence++
+}
+
 // CreateAndSignTx - creates a tx and signs it to be broadcasted
 // Everytime this is called, it will also automatically do a grpc call to get the latest acc sequence for signature
 func (w *Wallet) CreateAndSignTx(msgs []sdktypes.Msg) (tx authsigning.Tx, err error) {
 	txConfig := GetTxConfig()
 	txBuilder := txConfig.NewTxBuilder()
 
-	// Get acc to get latest sequence and account number
-	acc, err := api.GetAccount(w.GRPCURL, w.Bech32Addr)
-	if err != nil {
-		log.Error(err)
-		return nil, err
-	}
+	accountSequence := w.AccountSequence
+	w.IncrementAccountSequence()
 
 	// Set messages
 	err = txBuilder.SetMsgs(msgs...)
@@ -129,7 +130,7 @@ func (w *Wallet) CreateAndSignTx(msgs []sdktypes.Msg) (tx authsigning.Tx, err er
 			SignMode:  txConfig.SignModeHandler().DefaultMode(),
 			Signature: nil,
 		},
-		Sequence: acc.GetSequence(),
+		Sequence: accountSequence,
 	}
 
 	err = txBuilder.SetSignatures(sigV2)
@@ -141,12 +142,12 @@ func (w *Wallet) CreateAndSignTx(msgs []sdktypes.Msg) (tx authsigning.Tx, err er
 	// Second round: all signer infos are set, so each signer can sign.
 	signerData := authsigning.SignerData{
 		ChainID:       w.ChainID,
-		AccountNumber: acc.GetAccountNumber(),
-		Sequence:      acc.GetSequence(),
+		AccountNumber: w.AccountNumber,
+		Sequence:      accountSequence,
 	}
 	sigV2, err = clienttx.SignWithPrivKey(
 		txConfig.SignModeHandler().DefaultMode(), signerData,
-		txBuilder, w.PrivKey, txConfig, acc.GetSequence())
+		txBuilder, w.PrivKey, txConfig, accountSequence)
 	if err != nil {
 		return nil, err
 	}
@@ -224,6 +225,17 @@ func (w *Wallet) BroadcastTx(tx authsigning.Tx, mode BroadcastMode) (txResp *sdk
 	if grpcRes.TxResponse.Code != 0 {
 		err = fmt.Errorf("Broadcast failed with code: %+v, raw_log: %+v\n", grpcRes.TxResponse.Code, grpcRes.TxResponse.RawLog)
 		log.Error(err)
+
+		// handle account nonce mismatch error
+		if grpcRes.TxResponse.Code == 32 { // 32 is nonce error
+			acc, err := api.GetAccount(w.GRPCURL, w.Bech32Addr)
+			if err != nil {
+				err = fmt.Errorf("Unable to refetch account sequence: %+v\n", err)
+				log.Error(err)
+				return grpcRes.TxResponse, err
+			}
+			w.AccountSequence = acc.Sequence
+		}
 		return grpcRes.TxResponse, err
 	}
 

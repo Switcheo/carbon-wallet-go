@@ -110,6 +110,7 @@ func ConnectWallet(targetGRPCAddress string, privKey cmcryptotypes.PrivKey, labe
 
 	w = wallet.Wallet{
 		AccountNumber:             account.AccountNumber,
+		AccountSequence:           account.Sequence,
 		ChainID:                   chainID,
 		PrivKey:                   privKey,
 		PubKey:                    pubKey,
