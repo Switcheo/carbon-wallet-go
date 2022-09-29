@@ -90,7 +90,8 @@ func (w *Wallet) IncrementAccountSequence() {
 }
 
 // CreateAndSignTx - creates a tx and signs it to be broadcasted
-// Everytime this is called, it will also automatically do a grpc call to get the latest acc sequence for signature
+// Everytime this is called, the nonce will be incremented.
+// If there is a nonce error after broadcast, it'll refetch the nonce.
 func (w *Wallet) CreateAndSignTx(msgs []sdktypes.Msg) (tx authsigning.Tx, err error) {
 	txConfig := GetTxConfig()
 	txBuilder := txConfig.NewTxBuilder()
