@@ -7,17 +7,20 @@ import (
 	"strings"
 	"time"
 
+	log "github.com/sirupsen/logrus"
+
+	"github.com/cosmos/cosmos-sdk/codec"
+	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
+	"github.com/cosmos/cosmos-sdk/crypto"
+	cryptocodec "github.com/cosmos/cosmos-sdk/crypto/codec"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
+	cmcryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
+	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
+	"github.com/cosmos/cosmos-sdk/types/bech32"
 	"github.com/cosmos/cosmos-sdk/version"
 
 	"github.com/Switcheo/carbon-wallet-go/api"
 	"github.com/Switcheo/carbon-wallet-go/wallet"
-	cmcryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
-	"github.com/cosmos/cosmos-sdk/types/bech32"
-	log "github.com/sirupsen/logrus"
-
-	"github.com/cosmos/cosmos-sdk/crypto"
-	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 )
 
 type WalletConfig struct {
@@ -142,7 +145,7 @@ func getPrivKeyFromCLI(name, passphrase string) (cryptotypes.PrivKey, error) {
 		return nil, err
 	}
 	os.Stdin.Close() // force passphrase input from io.Reader
-	kb, err := keyring.New(version.Name, "file", path.Join(home, ".carbon"), strings.NewReader(passphrase+"\n"))
+	kb, err := keyring.New(version.Name, "file", path.Join(home, ".carbon"), strings.NewReader(passphrase+"\n"), getCodec())
 	if err != nil {
 		return nil, err
 	}
@@ -155,4 +158,10 @@ func getPrivKeyFromCLI(name, passphrase string) (cryptotypes.PrivKey, error) {
 		return nil, err
 	}
 	return privKey, nil
+}
+
+func getCodec() codec.Codec {
+	registry := codectypes.NewInterfaceRegistry()
+	cryptocodec.RegisterInterfaces(registry)
+	return codec.NewProtoCodec(registry)
 }

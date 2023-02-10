@@ -49,7 +49,7 @@ func DecShift(d sdk.Dec, n int64) sdk.Dec {
 // Dec10 returns sdk.Dec(10^n).
 func Dec10(n int64) sdk.Dec {
 	if n > 0 {
-		return sdk.NewIntWithDecimal(1, int(n)).ToDec()
+		return sdk.NewDec(10).Power(uint64(n))
 	}
 	return sdk.NewDecWithPrec(1, -n)
 }
