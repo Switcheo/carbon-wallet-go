@@ -2,12 +2,12 @@ package wallet
 
 import (
 	"context"
-	"time"
 	"github.com/Switcheo/carbon-wallet-go/api"
 	txtypes "github.com/cosmos/cosmos-sdk/types/tx"
-	"strings"
 	log "github.com/sirupsen/logrus"
 	"math"
+	"strings"
+	"time"
 )
 
 // RetryConfirmTransaction drops retry if txHash was created since timeout,
@@ -41,7 +41,7 @@ func (w *Wallet) GetConfirmTransactionRetryInterval(txHash TxHash) time.Duration
 }
 
 func (w *Wallet) ConfirmTransactionHash(txHash TxHash) {
-	grpcConn, err := api.GetGRPCConnection(w.GRPCURL)
+	grpcConn, err := api.GetGRPCConnection(w.GRPCURL, w.ClientCtx)
 	if err != nil {
 		go w.RetryConfirmTransaction(txHash)
 		log.Error("unable to open grpcConn")

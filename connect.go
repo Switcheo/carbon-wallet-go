@@ -1,6 +1,7 @@
 package carbonwalletgo
 
 import (
+	"github.com/cosmos/cosmos-sdk/client"
 	"golang.org/x/time/rate"
 	"os"
 	"path"
@@ -55,9 +56,9 @@ func DefaultWalletConfig() *WalletConfig {
 }
 
 // ConnectCliWallet connect to a cli wallet
-func ConnectCliWallet(targetGRPCAddress string, label string, password string, mainPrefix string, config *WalletConfig) (wallet wallet.Wallet) {
+func ConnectCliWallet(targetGRPCAddress string, label string, password string, mainPrefix string, config *WalletConfig, clientCtx client.Context) (wallet wallet.Wallet) {
 	for {
-		chainID, err := api.GetChainID(targetGRPCAddress)
+		chainID, err := api.GetChainID(targetGRPCAddress, clientCtx)
 		if err != nil {
 			log.Warnln(label, ": could not get chain id, will try again in a while", err.Error())
 			time.Sleep(time.Second * 3) // polling interval
@@ -71,7 +72,7 @@ func ConnectCliWallet(targetGRPCAddress string, label string, password string, m
 			continue
 		}
 
-		wallet, err = ConnectWallet(targetGRPCAddress, privKey, label, chainID, mainPrefix, config)
+		wallet, err = ConnectWallet(targetGRPCAddress, privKey, label, chainID, mainPrefix, config, clientCtx)
 		if err != nil {
 			log.Warnln(label, ": could not connect to wallet, will try again in a while", err.Error())
 			time.Sleep(time.Second * 3) // polling interval
@@ -85,18 +86,18 @@ func ConnectCliWallet(targetGRPCAddress string, label string, password string, m
 }
 
 // ConnectWallet - inits wallet
-func ConnectWallet(targetGRPCAddress string, privKey cmcryptotypes.PrivKey, label string, chainID string, mainPrefix string, config *WalletConfig) (w wallet.Wallet, err error) {
+func ConnectWallet(targetGRPCAddress string, privKey cmcryptotypes.PrivKey, label string, chainID string, mainPrefix string, config *WalletConfig, clientCtx client.Context) (w wallet.Wallet, err error) {
 	pubKey := privKey.PubKey()
 	bech32Addr, err := bech32.ConvertAndEncode(mainPrefix, pubKey.Address())
 	if err != nil {
 		return
 	}
-	account, err := api.GetAccount(targetGRPCAddress, bech32Addr)
+	account, err := api.GetAccount(targetGRPCAddress, bech32Addr, clientCtx)
 	if err != nil {
 		if strings.Contains(err.Error(), "connect: connection refused") {
 			log.Info("connection refused, retrying...")
 			time.Sleep(100 * time.Millisecond)
-			return ConnectWallet(targetGRPCAddress, privKey, label, chainID, mainPrefix, config)
+			return ConnectWallet(targetGRPCAddress, privKey, label, chainID, mainPrefix, config, clientCtx)
 		}
 		return
 	}
@@ -104,7 +105,7 @@ func ConnectWallet(targetGRPCAddress string, privKey cmcryptotypes.PrivKey, labe
 	if account.AccountNumber == 0 {
 		log.Info("account not yet setup, will retry in a while...")
 		time.Sleep(1000 * time.Millisecond)
-		return ConnectWallet(targetGRPCAddress, privKey, label, chainID, mainPrefix, config)
+		return ConnectWallet(targetGRPCAddress, privKey, label, chainID, mainPrefix, config, clientCtx)
 	}
 
 	if config == nil {
@@ -128,6 +129,7 @@ func ConnectWallet(targetGRPCAddress string, privKey cmcryptotypes.PrivKey, labe
 		ResponseChannel:           make(chan wallet.SubmitMsgResponse, config.ResponseChannelLength),
 		StopChannel:               make(chan int, 3),
 		ConfirmTransactionChannel: make(chan wallet.TxHash, config.ConfirmTransactionChannelLength),
+		ClientCtx:                 clientCtx,
 	}
 
 	w.UpdateBlockHeight()

@@ -78,6 +78,7 @@ type Wallet struct {
 	ConfirmTransactionChannel     chan TxHash
 	ConfirmTransactionMinInterval time.Duration
 	ConfirmTransactionTimeout     time.Duration
+	ClientCtx                     client.Context
 }
 
 // AccAddress -
@@ -168,7 +169,7 @@ func (w *Wallet) UpdateBlockHeight() {
 		return
 	}
 
-	blockHeight, err := api.GetLatestBlockHeight(w.GRPCURL)
+	blockHeight, err := api.GetLatestBlockHeight(w.GRPCURL, w.ClientCtx)
 	if err != nil {
 		panic("unable to get latest block height of chain")
 	}
@@ -200,7 +201,7 @@ func (w *Wallet) BroadcastTx(tx authsigning.Tx, mode BroadcastMode) (txResp *sdk
 
 	// Broadcast the tx via gRPC. We create a new client for the Protobuf Tx
 	// service.
-	grpcConn, err := api.GetGRPCConnection(w.GRPCURL)
+	grpcConn, err := api.GetGRPCConnection(w.GRPCURL, w.ClientCtx)
 	if err != nil {
 		return nil, err
 	}
@@ -229,7 +230,7 @@ func (w *Wallet) BroadcastTx(tx authsigning.Tx, mode BroadcastMode) (txResp *sdk
 
 		// handle account nonce mismatch error
 		if grpcRes.TxResponse.Code == 32 { // 32 is nonce error
-			acc, err := api.GetAccount(w.GRPCURL, w.Bech32Addr)
+			acc, err := api.GetAccount(w.GRPCURL, w.Bech32Addr, w.ClientCtx)
 			if err != nil {
 				err = fmt.Errorf("Unable to refetch account sequence: %+v\n", err)
 				log.Error(err)
