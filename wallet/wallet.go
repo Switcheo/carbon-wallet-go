@@ -221,7 +221,7 @@ func (w *Wallet) BroadcastTx(tx authsigning.Tx, mode BroadcastMode) (txResp *sdk
 	)
 	if err != nil {
 		log.Error(err)
-		return grpcRes.TxResponse, err
+		return nil, err
 	}
 
 	if grpcRes.TxResponse.Code != 0 {
