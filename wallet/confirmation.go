@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-type txStatusUpdateFunc func(txHash string, responseCode uint32)
+type txStatusUpdateFunc func(txHash string, responseCode float32)
 
 func RegisterTxStatusUpdateHook(callback txStatusUpdateFunc) {
 	txStatusUpdateHook = callback
@@ -23,7 +23,7 @@ var txStatusUpdateHook txStatusUpdateFunc
 func (w *Wallet) RetryConfirmTransaction(txHash TxHash) {
 	if time.Now().After(txHash.CreatedAt.Add(w.GetConfirmTransactionTimeout())) {
 		if txStatusUpdateHook != nil {
-			txStatusUpdateHook(txHash.Hash, 4)
+			txStatusUpdateHook(txHash.Hash, -1)
 		}
 		log.Errorf("RetryConfirmTransaction timeout for %+v", txHash.Hash)
 		return
@@ -71,7 +71,7 @@ func (w *Wallet) ConfirmTransactionHash(txHash TxHash) {
 
 	response := grpcRes.TxResponse
 	if txStatusUpdateHook != nil {
-		txStatusUpdateHook(response.TxHash, response.Code)
+		txStatusUpdateHook(response.TxHash, float32(response.Code))
 	}
 	if response.Code == 0 {
 		log.Infof("Transaction succeeded: %+v", response.TxHash)
