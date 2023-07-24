@@ -23,6 +23,7 @@ var txStatusUpdateHook txStatusUpdateFunc
 func (w *Wallet) RetryConfirmTransaction(txHash TxHash) {
 	if time.Now().After(txHash.CreatedAt.Add(w.GetConfirmTransactionTimeout())) {
 		if txStatusUpdateHook != nil {
+			// use -1 to represent time out
 			txStatusUpdateHook(txHash.Hash, -1)
 		}
 		log.Errorf("RetryConfirmTransaction timeout for %+v", txHash.Hash)
