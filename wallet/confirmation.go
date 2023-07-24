@@ -2,7 +2,9 @@ package wallet
 
 import (
 	"context"
+	"fmt"
 	"github.com/Switcheo/carbon-wallet-go/api"
+	"github.com/cosmos/cosmos-sdk/types"
 	txtypes "github.com/cosmos/cosmos-sdk/types/tx"
 	log "github.com/sirupsen/logrus"
 	"math"
@@ -10,21 +12,22 @@ import (
 	"time"
 )
 
-type txStatusUpdateFunc func(txHash string, responseCode float32)
+type txResponseFunc func(response *types.TxResponse, err error)
 
-func RegisterTxStatusUpdateHook(callback txStatusUpdateFunc) {
-	txStatusUpdateHook = callback
+func RegisterTxResponseHook(callback txResponseFunc) {
+	txResponseHook = callback
 }
 
-var txStatusUpdateHook txStatusUpdateFunc
+var txResponseHook txResponseFunc
 
 // RetryConfirmTransaction drops retry if txHash was created since timeout,
 // otherwise sends txHash to ConfirmTransactionChannel
 func (w *Wallet) RetryConfirmTransaction(txHash TxHash) {
 	if time.Now().After(txHash.CreatedAt.Add(w.GetConfirmTransactionTimeout())) {
-		if txStatusUpdateHook != nil {
-			// use -1 to represent time out
-			txStatusUpdateHook(txHash.Hash, -1)
+		if txResponseHook != nil {
+			var response types.TxResponse
+			response.TxHash = txHash.Hash
+			txResponseHook(&response, fmt.Errorf("transaction error: transaction timed out"))
 		}
 		log.Errorf("RetryConfirmTransaction timeout for %+v", txHash.Hash)
 		return
@@ -71,13 +74,16 @@ func (w *Wallet) ConfirmTransactionHash(txHash TxHash) {
 	}
 
 	response := grpcRes.TxResponse
-	if txStatusUpdateHook != nil {
-		txStatusUpdateHook(response.TxHash, float32(response.Code))
-	}
 	if response.Code == 0 {
 		log.Infof("Transaction succeeded: %+v", response.TxHash)
+		if txResponseHook != nil {
+			txResponseHook(response, nil)
+		}
 	} else {
 		log.Errorf("Transaction failed: txHash: %+v, code: %+v, raw_log: %+v\n", response.TxHash, response.Code, response.RawLog)
+		if txResponseHook != nil {
+			txResponseHook(response, fmt.Errorf("transaction error: transaction failed"))
+		}
 	}
 }
 
