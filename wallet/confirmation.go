@@ -12,23 +12,21 @@ import (
 	"time"
 )
 
-type txResponseFunc func(response *types.TxResponse, err error)
-
-func RegisterTxResponseHook(callback txResponseFunc) {
-	txResponseHook = callback
+func (w *Wallet) runCallback(response *types.TxResponse, items []MsgQueueItem, err error) {
+	for _, item := range items {
+		if item.Callback != nil {
+			item.Callback(response, item.Msg, err)
+		}
+	}
 }
-
-var txResponseHook txResponseFunc
 
 // RetryConfirmTransaction drops retry if txHash was created since timeout,
 // otherwise sends txHash to ConfirmTransactionChannel
 func (w *Wallet) RetryConfirmTransaction(txHash TxHash) {
 	if time.Now().After(txHash.CreatedAt.Add(w.GetConfirmTransactionTimeout())) {
-		if txResponseHook != nil {
-			var response types.TxResponse
-			response.TxHash = txHash.Hash
-			txResponseHook(&response, fmt.Errorf("transaction error: transaction timed out"))
-		}
+		var response *types.TxResponse
+		response.TxHash = txHash.Hash
+		w.runCallback(response, txHash.Items, fmt.Errorf("transaction error: transaction timed out"))
 		log.Errorf("RetryConfirmTransaction timeout for %+v", txHash.Hash)
 		return
 	}
@@ -76,14 +74,10 @@ func (w *Wallet) ConfirmTransactionHash(txHash TxHash) {
 	response := grpcRes.TxResponse
 	if response.Code == 0 {
 		log.Infof("Transaction succeeded: %+v", response.TxHash)
-		if txResponseHook != nil {
-			txResponseHook(response, nil)
-		}
+		w.runCallback(response, txHash.Items, nil)
 	} else {
 		log.Errorf("Transaction failed: txHash: %+v, code: %+v, raw_log: %+v\n", response.TxHash, response.Code, response.RawLog)
-		if txResponseHook != nil {
-			txResponseHook(response, fmt.Errorf("transaction error: transaction failed"))
-		}
+		w.runCallback(response, txHash.Items, fmt.Errorf("transaction error: transaction failed"))
 	}
 }
 
