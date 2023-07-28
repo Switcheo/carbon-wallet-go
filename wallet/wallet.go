@@ -46,13 +46,15 @@ type SubmitMsgResponse struct {
 
 // MsgQueueItem message queue item
 type MsgQueueItem struct {
-	ID    string
-	Msg   sdktypes.Msg
-	Async bool
+	ID       string
+	Msg      sdktypes.Msg
+	Async    bool
+	Callback func(*sdktypes.TxResponse, sdktypes.Msg, error)
 }
 
-type TxHash struct {
+type TxItems struct {
 	Hash       string
+	Items      []MsgQueueItem
 	CreatedAt  time.Time
 	RetryCount uint
 }
@@ -75,7 +77,7 @@ type Wallet struct {
 	MsgQueue                      chan MsgQueueItem
 	ResponseChannel               chan SubmitMsgResponse
 	StopChannel                   chan int
-	ConfirmTransactionChannel     chan TxHash
+	ConfirmTransactionChannel     chan TxItems
 	ConfirmTransactionMinInterval time.Duration
 	ConfirmTransactionTimeout     time.Duration
 	ClientCtx                     client.Context
@@ -162,7 +164,7 @@ func (w *Wallet) CreateAndSignTx(msgs []sdktypes.Msg) (tx authsigning.Tx, err er
 	return txBuilder.GetTx(), nil
 }
 
-// UpdateBlockHeight updates the block height using rate limiter to update CurrentBlockHeight
+// UpdateBlockHeight updates the block height using rate limiter to update CurrentBlockHeight.
 // CurrentBlockHeight is used to calculate tx.TimeoutHeight
 func (w *Wallet) UpdateBlockHeight() {
 	if !w.UpdateBlockHeightLimiter.Allow() {
@@ -183,7 +185,7 @@ func (w *Wallet) GetCurrentBlockHeight() int64 {
 }
 
 // BroadcastTx - broadcasts a tx via grpc
-func (w *Wallet) BroadcastTx(tx authsigning.Tx, mode BroadcastMode) (txResp *sdktypes.TxResponse, err error) {
+func (w *Wallet) BroadcastTx(tx authsigning.Tx, mode BroadcastMode, items []MsgQueueItem) (txResp *sdktypes.TxResponse, err error) {
 	switch mode {
 	case BroadcastModeAsync:
 	case BroadcastModeSync:
@@ -243,7 +245,7 @@ func (w *Wallet) BroadcastTx(tx authsigning.Tx, mode BroadcastMode) (txResp *sdk
 
 	txHash := grpcRes.TxResponse.TxHash
 	log.Info("Broadcasted tx hash: ", txHash)
-	w.ConfirmTransactionChannel <- TxHash{Hash: grpcRes.TxResponse.TxHash, CreatedAt: time.Now(), RetryCount: 0}
+	w.ConfirmTransactionChannel <- TxItems{Hash: grpcRes.TxResponse.TxHash, CreatedAt: time.Now(), RetryCount: 0, Items: items}
 
 	return grpcRes.TxResponse, nil
 }
@@ -266,12 +268,13 @@ func (w *Wallet) SubmitMsg(msg sdktypes.Msg) (*sdktypes.TxResponse, error) {
 }
 
 // SubmitMsgAsync non-blocking submit
-func (w *Wallet) SubmitMsgAsync(msg sdktypes.Msg) {
+func (w *Wallet) SubmitMsgAsync(msg sdktypes.Msg, callback func(*sdktypes.TxResponse, sdktypes.Msg, error)) {
 	id := uuid.New().String()
 	item := MsgQueueItem{
-		ID:    id,
-		Msg:   msg,
-		Async: true,
+		ID:       id,
+		Msg:      msg,
+		Async:    true,
+		Callback: callback,
 	}
 	w.MsgQueue <- item
 }
@@ -305,7 +308,7 @@ func (w *Wallet) ProcessMsgQueue() {
 	}
 
 	var responseErr error
-	response, err := w.BroadcastTx(tx, BroadcastModeBlock)
+	response, err := w.BroadcastTx(tx, BroadcastModeBlock, items)
 	if err != nil {
 		responseErr = err
 	}
