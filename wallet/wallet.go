@@ -52,11 +52,11 @@ type MsgQueueItem struct {
 	Callback func(*sdktypes.TxResponse, sdktypes.Msg, error)
 }
 
-type TxHash struct {
+type TxItems struct {
 	Hash       string
+	Items      []MsgQueueItem
 	CreatedAt  time.Time
 	RetryCount uint
-	Items      []MsgQueueItem
 }
 
 // Wallet - used to submit tx
@@ -77,7 +77,7 @@ type Wallet struct {
 	MsgQueue                      chan MsgQueueItem
 	ResponseChannel               chan SubmitMsgResponse
 	StopChannel                   chan int
-	ConfirmTransactionChannel     chan TxHash
+	ConfirmTransactionChannel     chan TxItems
 	ConfirmTransactionMinInterval time.Duration
 	ConfirmTransactionTimeout     time.Duration
 	ClientCtx                     client.Context
@@ -164,7 +164,7 @@ func (w *Wallet) CreateAndSignTx(msgs []sdktypes.Msg) (tx authsigning.Tx, err er
 	return txBuilder.GetTx(), nil
 }
 
-// UpdateBlockHeight updates the block height using rate limiter to update CurrentBlockHeight
+// UpdateBlockHeight updates the block height using rate limiter to update CurrentBlockHeight.
 // CurrentBlockHeight is used to calculate tx.TimeoutHeight
 func (w *Wallet) UpdateBlockHeight() {
 	if !w.UpdateBlockHeightLimiter.Allow() {
@@ -245,7 +245,7 @@ func (w *Wallet) BroadcastTx(tx authsigning.Tx, mode BroadcastMode, items []MsgQ
 
 	txHash := grpcRes.TxResponse.TxHash
 	log.Info("Broadcasted tx hash: ", txHash)
-	w.ConfirmTransactionChannel <- TxHash{Hash: grpcRes.TxResponse.TxHash, CreatedAt: time.Now(), RetryCount: 0, Items: items}
+	w.ConfirmTransactionChannel <- TxItems{Hash: grpcRes.TxResponse.TxHash, CreatedAt: time.Now(), RetryCount: 0, Items: items}
 
 	return grpcRes.TxResponse, nil
 }

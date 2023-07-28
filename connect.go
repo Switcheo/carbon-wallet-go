@@ -128,7 +128,7 @@ func ConnectWallet(targetGRPCAddress string, privKey cmcryptotypes.PrivKey, labe
 		MsgQueue:                  make(chan wallet.MsgQueueItem, config.MsgQueueLength),
 		ResponseChannel:           make(chan wallet.SubmitMsgResponse, config.ResponseChannelLength),
 		StopChannel:               make(chan int, 3),
-		ConfirmTransactionChannel: make(chan wallet.TxHash, config.ConfirmTransactionChannelLength),
+		ConfirmTransactionChannel: make(chan wallet.TxItems, config.ConfirmTransactionChannelLength),
 		ClientCtx:                 clientCtx,
 	}
 
