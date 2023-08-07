@@ -24,9 +24,8 @@ func (w *Wallet) runCallback(response *types.TxResponse, items []MsgQueueItem, e
 // otherwise sends txItems to ConfirmTransactionChannel
 func (w *Wallet) RetryConfirmTransaction(txItems TxItems) {
 	if time.Now().After(txItems.CreatedAt.Add(w.GetConfirmTransactionTimeout())) {
-		var response *types.TxResponse
-		response.TxHash = txItems.Hash
-		w.runCallback(response, txItems.Items, fmt.Errorf("transaction error: transaction timed out"))
+		response := types.TxResponse{TxHash: txItems.Hash}
+		w.runCallback(&response, txItems.Items, fmt.Errorf("transaction error: transaction timed out"))
 		log.Errorf("RetryConfirmTransaction timeout for %+v", txItems.Hash)
 		return
 	}
