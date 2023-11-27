@@ -3,10 +3,12 @@ package wallet
 import (
 	"context"
 	"fmt"
-	"golang.org/x/time/rate"
 	"strings"
 	"time"
 
+	"golang.org/x/time/rate"
+
+	sdkmath "cosmossdk.io/math"
 	"github.com/Switcheo/carbon-wallet-go/constants"
 	"github.com/Switcheo/carbon-wallet-go/utils"
 	"github.com/cosmos/cosmos-sdk/client"
@@ -111,7 +113,7 @@ func (w *Wallet) CreateAndSignTx(msgs []sdktypes.Msg) (tx authsigning.Tx, err er
 
 	// Set other tx details
 	var feeCoins types.Coins = make([]types.Coin, 1)
-	feeAmount := utils.MustDecShiftInt(types.NewDec(int64(len(txBuilder.GetTx().GetMsgs()))), 8)
+	feeAmount := utils.MustDecShiftInt(sdkmath.LegacyNewDec(int64(len(txBuilder.GetTx().GetMsgs()))), 8)
 	feeCoins[0] = types.Coin{
 		Denom:  constants.MainDenom,
 		Amount: feeAmount,
@@ -131,7 +133,7 @@ func (w *Wallet) CreateAndSignTx(msgs []sdktypes.Msg) (tx authsigning.Tx, err er
 	sigV2 := signingtypes.SignatureV2{
 		PubKey: w.PrivKey.PubKey(),
 		Data: &signingtypes.SingleSignatureData{
-			SignMode:  txConfig.SignModeHandler().DefaultMode(),
+			SignMode:  signingtypes.SignMode_SIGN_MODE_UNSPECIFIED,
 			Signature: nil,
 		},
 		Sequence: accountSequence,
@@ -150,7 +152,8 @@ func (w *Wallet) CreateAndSignTx(msgs []sdktypes.Msg) (tx authsigning.Tx, err er
 		Sequence:      accountSequence,
 	}
 	sigV2, err = clienttx.SignWithPrivKey(
-		txConfig.SignModeHandler().DefaultMode(), signerData,
+		w.ClientCtx.CmdContext,
+		signingtypes.SignMode_SIGN_MODE_UNSPECIFIED, signerData,
 		txBuilder, w.PrivKey, txConfig, accountSequence)
 	if err != nil {
 		return nil, err

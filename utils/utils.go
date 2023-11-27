@@ -3,7 +3,7 @@ package utils
 import (
 	"fmt"
 
-	sdk "github.com/cosmos/cosmos-sdk/types"
+	sdkmath "cosmossdk.io/math"
 )
 
 // MustDecShiftInt d shifted by n places as an integer. The shift is of the decimal point,
@@ -14,7 +14,7 @@ import (
 // Panics if the value is not an integer after shifting.
 //
 // Use for converting quantites from their human representation into integer form.
-func MustDecShiftInt(d sdk.Dec, n int64) sdk.Int {
+func MustDecShiftInt(d sdkmath.LegacyDec, n int64) sdkmath.Int {
 	i, err := DecShiftInt(d, n)
 	if err != nil {
 		panic(err)
@@ -30,10 +30,10 @@ func MustDecShiftInt(d sdk.Dec, n int64) sdk.Int {
 // Returns an error if the value is not an integer after shifting.
 //
 // Use for converting quantites from their human representation into integer form.
-func DecShiftInt(d sdk.Dec, n int64) (sdk.Int, error) {
+func DecShiftInt(d sdkmath.LegacyDec, n int64) (sdkmath.Int, error) {
 	d2 := DecShift(d, n)
 	if !d2.IsInteger() {
-		return sdk.ZeroInt(), fmt.Errorf("failed to convert human decimal '%v' to raw integer with precision '%v'", d, n)
+		return sdkmath.ZeroInt(), fmt.Errorf("failed to convert human decimal '%v' to raw integer with precision '%v'", d, n)
 	}
 	return d2.TruncateInt(), nil
 }
@@ -42,14 +42,14 @@ func DecShiftInt(d sdk.Dec, n int64) (sdk.Int, error) {
 // in which case the result is truncated.
 //
 // Use for converting prices from their human representation into their machine form.
-func DecShift(d sdk.Dec, n int64) sdk.Dec {
+func DecShift(d sdkmath.LegacyDec, n int64) sdkmath.LegacyDec {
 	return d.Mul(Dec10(n))
 }
 
-// Dec10 returns sdk.Dec(10^n).
-func Dec10(n int64) sdk.Dec {
+// Dec10 returns sdkmath.LegacyDec(10^n).
+func Dec10(n int64) sdkmath.LegacyDec {
 	if n > 0 {
-		return sdk.NewDec(10).Power(uint64(n))
+		return sdkmath.LegacyNewDec(10).Power(uint64(n))
 	}
-	return sdk.NewDecWithPrec(1, -n)
+	return sdkmath.LegacyNewDecWithPrec(1, -n)
 }
