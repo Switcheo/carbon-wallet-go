@@ -132,7 +132,7 @@ func (w *Wallet) CreateAndSignTx(msgs []sdktypes.Msg) (tx authsigning.Tx, err er
 	sigV2 := signingtypes.SignatureV2{
 		PubKey: w.PrivKey.PubKey(),
 		Data: &signingtypes.SingleSignatureData{
-			SignMode:  signingtypes.SignMode_SIGN_MODE_UNSPECIFIED,
+			SignMode:  signingtypes.SignMode_SIGN_MODE_DIRECT,
 			Signature: nil,
 		},
 		Sequence: accountSequence,
@@ -152,14 +152,16 @@ func (w *Wallet) CreateAndSignTx(msgs []sdktypes.Msg) (tx authsigning.Tx, err er
 	}
 	sigV2, err = clienttx.SignWithPrivKey(
 		context.Background(),
-		signingtypes.SignMode_SIGN_MODE_UNSPECIFIED, signerData,
+		signingtypes.SignMode_SIGN_MODE_DIRECT, signerData,
 		txBuilder, w.PrivKey, txConfig, accountSequence)
 	if err != nil {
+		log.Error(err)
 		return nil, err
 	}
 
 	err = txBuilder.SetSignatures(sigV2)
 	if err != nil {
+		log.Error(err)
 		return nil, err
 	}
 
@@ -199,6 +201,7 @@ func (w *Wallet) BroadcastTx(tx authsigning.Tx, mode BroadcastMode, items []MsgQ
 	txConfig := GetTxConfig()
 	txBytes, err := txConfig.TxEncoder()(tx)
 	if err != nil {
+		log.Error(err)
 		return nil, err
 	}
 
@@ -206,6 +209,7 @@ func (w *Wallet) BroadcastTx(tx authsigning.Tx, mode BroadcastMode, items []MsgQ
 	// service.
 	grpcConn, err := api.GetGRPCConnection(w.GRPCURL, w.ClientCtx)
 	if err != nil {
+		log.Error(err)
 		return nil, err
 	}
 	defer grpcConn.Close()
