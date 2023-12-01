@@ -109,7 +109,7 @@ func (w *Wallet) CreateAndSignTx(msgs []sdktypes.Msg) (tx authsigning.Tx, err er
 	// Set messages
 	err = txBuilder.SetMsgs(msgs...)
 	if err != nil {
-		log.Error(err)
+		log.Error("setmsg err", err)
 		return nil, err
 	}
 
@@ -143,7 +143,7 @@ func (w *Wallet) CreateAndSignTx(msgs []sdktypes.Msg) (tx authsigning.Tx, err er
 
 	err = txBuilder.SetSignatures(sigV2)
 	if err != nil {
-		log.Error(err)
+		log.Error("setsig err", err)
 		return nil, err
 	}
 
@@ -158,13 +158,13 @@ func (w *Wallet) CreateAndSignTx(msgs []sdktypes.Msg) (tx authsigning.Tx, err er
 		signingtypes.SignMode_SIGN_MODE_DIRECT, signerData,
 		txBuilder, w.PrivKey, txConfig, accountSequence)
 	if err != nil {
-		log.Error(err)
+		log.Error("sign err", err)
 		return nil, err
 	}
 
 	err = txBuilder.SetSignatures(sigV2)
 	if err != nil {
-		log.Error(err)
+		log.Error("setsig err", err)
 		return nil, err
 	}
 
@@ -309,6 +309,7 @@ func (w *Wallet) ProcessMsgQueue() {
 
 	tx, err := w.CreateAndSignTx(msgs)
 	if err != nil {
+		log.Error("create ang sign tx err", err)
 		for _, item := range items {
 			w.EnqueueMsgResponse(item, &sdktypes.TxResponse{}, err)
 		}
