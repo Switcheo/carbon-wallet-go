@@ -9,17 +9,20 @@ import (
 	"golang.org/x/time/rate"
 
 	sdkmath "cosmossdk.io/math"
+	"cosmossdk.io/x/tx/signing"
 	"github.com/Switcheo/carbon-wallet-go/constants"
 	"github.com/Switcheo/carbon-wallet-go/utils"
 	"github.com/cosmos/cosmos-sdk/client"
 	clienttx "github.com/cosmos/cosmos-sdk/client/tx"
 	"github.com/cosmos/cosmos-sdk/codec"
+	"github.com/cosmos/cosmos-sdk/codec/address"
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
 	cmcryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	"github.com/cosmos/cosmos-sdk/types"
 	txtypes "github.com/cosmos/cosmos-sdk/types/tx"
 	signingtypes "github.com/cosmos/cosmos-sdk/types/tx/signing"
 	authtxtypes "github.com/cosmos/cosmos-sdk/x/auth/tx"
+	"github.com/cosmos/gogoproto/proto"
 
 	"github.com/Switcheo/carbon-wallet-go/api"
 	sdktypes "github.com/cosmos/cosmos-sdk/types"
@@ -201,7 +204,7 @@ func (w *Wallet) BroadcastTx(tx authsigning.Tx, mode BroadcastMode, items []MsgQ
 	txConfig := GetTxConfig()
 	txBytes, err := txConfig.TxEncoder()(tx)
 	if err != nil {
-		log.Error(err)
+		log.Error("encoding err", err)
 		return nil, err
 	}
 
@@ -209,7 +212,7 @@ func (w *Wallet) BroadcastTx(tx authsigning.Tx, mode BroadcastMode, items []MsgQ
 	// service.
 	grpcConn, err := api.GetGRPCConnection(w.GRPCURL, w.ClientCtx)
 	if err != nil {
-		log.Error(err)
+		log.Error("grpc error", err)
 		return nil, err
 	}
 	defer grpcConn.Close()
@@ -364,7 +367,20 @@ func (w *Wallet) Disconnect() {
 
 func GetTxConfig() client.TxConfig {
 	// Choose codec: Amino or Protobuf. Here, we use Protobuf
-	interfaceRegistry := codectypes.NewInterfaceRegistry()
+	interfaceRegistry, _ := codectypes.NewInterfaceRegistryWithOptions(
+		// todo: should panic here?
+		codectypes.InterfaceRegistryOptions{
+			ProtoFiles: proto.HybridResolver,
+			SigningOptions: signing.Options{
+				AddressCodec: address.Bech32Codec{
+					Bech32Prefix: "tswth",
+				},
+				ValidatorAddressCodec: address.Bech32Codec{
+					Bech32Prefix: "tswthvaloper",
+				},
+			},
+		},
+	)
 	protoCodec := codec.NewProtoCodec(interfaceRegistry)
 	return authtxtypes.NewTxConfig(protoCodec, []signingtypes.SignMode{signingtypes.SignMode_SIGN_MODE_DIRECT})
 }
