@@ -152,6 +152,7 @@ func (w *Wallet) CreateAndSignTx(msgs []sdktypes.Msg) (tx authsigning.Tx, err er
 		ChainID:       w.ChainID,
 		AccountNumber: w.AccountNumber,
 		Sequence:      accountSequence,
+		PubKey:        w.PrivKey.PubKey(),
 	}
 	sigV2, err = clienttx.SignWithPrivKey(
 		context.Background(),
