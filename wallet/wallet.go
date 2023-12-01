@@ -33,7 +33,6 @@ const (
 	DefaultGas         = 1000000000000
 	BroadcastModeAsync = BroadcastMode("async")
 	BroadcastModeSync  = BroadcastMode("sync")
-	BroadcastModeBlock = BroadcastMode("block")
 )
 
 // BroadcastMode - async, sync and block are only supported
@@ -152,7 +151,7 @@ func (w *Wallet) CreateAndSignTx(msgs []sdktypes.Msg) (tx authsigning.Tx, err er
 		Sequence:      accountSequence,
 	}
 	sigV2, err = clienttx.SignWithPrivKey(
-		w.ClientCtx.CmdContext,
+		context.Background(),
 		signingtypes.SignMode_SIGN_MODE_UNSPECIFIED, signerData,
 		txBuilder, w.PrivKey, txConfig, accountSequence)
 	if err != nil {
@@ -192,7 +191,6 @@ func (w *Wallet) BroadcastTx(tx authsigning.Tx, mode BroadcastMode, items []MsgQ
 	switch mode {
 	case BroadcastModeAsync:
 	case BroadcastModeSync:
-	case BroadcastModeBlock:
 	default:
 		err = fmt.Errorf("invalid broadcast mode: %s", mode)
 		return
@@ -311,7 +309,7 @@ func (w *Wallet) ProcessMsgQueue() {
 	}
 
 	var responseErr error
-	response, err := w.BroadcastTx(tx, BroadcastModeBlock, items)
+	response, err := w.BroadcastTx(tx, BroadcastModeSync, items)
 	if err != nil {
 		responseErr = err
 	}
