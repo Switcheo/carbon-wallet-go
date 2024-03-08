@@ -84,11 +84,11 @@ func GetLatestBlockHeight(targetGRPCAddress string, clientCtx client.Context) (h
 		context.Background(),
 		&cmtservice.GetLatestBlockRequest{},
 	)
-	height = lastestBlockRes.Block.Header.Height
 	if err != nil {
 		log.Error(err)
 		return 0, err
 	}
+	height = lastestBlockRes.SdkBlock.Header.Height
 	if height <= 0 {
 		err = errors.New(fmt.Sprintf("get latest block height is invalid: %+v\n", height))
 		log.Error(err)
