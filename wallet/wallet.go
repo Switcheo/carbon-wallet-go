@@ -3,10 +3,12 @@ package wallet
 import (
 	"context"
 	"fmt"
-	"golang.org/x/time/rate"
 	"strings"
 	"time"
 
+	"golang.org/x/time/rate"
+
+	sdkmath "cosmossdk.io/math"
 	"github.com/Switcheo/carbon-wallet-go/constants"
 	"github.com/Switcheo/carbon-wallet-go/utils"
 	"github.com/cosmos/cosmos-sdk/client"
@@ -31,7 +33,6 @@ const (
 	DefaultGas         = 1000000000000
 	BroadcastModeAsync = BroadcastMode("async")
 	BroadcastModeSync  = BroadcastMode("sync")
-	BroadcastModeBlock = BroadcastMode("block")
 )
 
 // BroadcastMode - async, sync and block are only supported
@@ -105,13 +106,13 @@ func (w *Wallet) CreateAndSignTx(msgs []sdktypes.Msg) (tx authsigning.Tx, err er
 	// Set messages
 	err = txBuilder.SetMsgs(msgs...)
 	if err != nil {
-		log.Error(err)
+		log.Error("setmsg err: ", err)
 		return nil, err
 	}
 
 	// Set other tx details
 	var feeCoins types.Coins = make([]types.Coin, 1)
-	feeAmount := utils.MustDecShiftInt(types.NewDec(int64(len(txBuilder.GetTx().GetMsgs()))), 8)
+	feeAmount := utils.MustDecShiftInt(sdkmath.LegacyNewDec(int64(len(txBuilder.GetTx().GetMsgs()))), 8)
 	feeCoins[0] = types.Coin{
 		Denom:  constants.MainDenom,
 		Amount: feeAmount,
@@ -131,7 +132,7 @@ func (w *Wallet) CreateAndSignTx(msgs []sdktypes.Msg) (tx authsigning.Tx, err er
 	sigV2 := signingtypes.SignatureV2{
 		PubKey: w.PrivKey.PubKey(),
 		Data: &signingtypes.SingleSignatureData{
-			SignMode:  txConfig.SignModeHandler().DefaultMode(),
+			SignMode:  signingtypes.SignMode_SIGN_MODE_DIRECT,
 			Signature: nil,
 		},
 		Sequence: accountSequence,
@@ -139,7 +140,7 @@ func (w *Wallet) CreateAndSignTx(msgs []sdktypes.Msg) (tx authsigning.Tx, err er
 
 	err = txBuilder.SetSignatures(sigV2)
 	if err != nil {
-		log.Error(err)
+		log.Error("setsig err: ", err)
 		return nil, err
 	}
 
@@ -148,16 +149,20 @@ func (w *Wallet) CreateAndSignTx(msgs []sdktypes.Msg) (tx authsigning.Tx, err er
 		ChainID:       w.ChainID,
 		AccountNumber: w.AccountNumber,
 		Sequence:      accountSequence,
+		PubKey:        w.PrivKey.PubKey(),
 	}
 	sigV2, err = clienttx.SignWithPrivKey(
-		txConfig.SignModeHandler().DefaultMode(), signerData,
+		context.Background(),
+		signingtypes.SignMode_SIGN_MODE_DIRECT, signerData,
 		txBuilder, w.PrivKey, txConfig, accountSequence)
 	if err != nil {
+		log.Error("sign err: ", err)
 		return nil, err
 	}
 
 	err = txBuilder.SetSignatures(sigV2)
 	if err != nil {
+		log.Error("setsig err: ", err)
 		return nil, err
 	}
 
@@ -189,7 +194,6 @@ func (w *Wallet) BroadcastTx(tx authsigning.Tx, mode BroadcastMode, items []MsgQ
 	switch mode {
 	case BroadcastModeAsync:
 	case BroadcastModeSync:
-	case BroadcastModeBlock:
 	default:
 		err = fmt.Errorf("invalid broadcast mode: %s", mode)
 		return
@@ -198,6 +202,7 @@ func (w *Wallet) BroadcastTx(tx authsigning.Tx, mode BroadcastMode, items []MsgQ
 	txConfig := GetTxConfig()
 	txBytes, err := txConfig.TxEncoder()(tx)
 	if err != nil {
+		log.Error("encoding err: ", err)
 		return nil, err
 	}
 
@@ -205,6 +210,7 @@ func (w *Wallet) BroadcastTx(tx authsigning.Tx, mode BroadcastMode, items []MsgQ
 	// service.
 	grpcConn, err := api.GetGRPCConnection(w.GRPCURL, w.ClientCtx)
 	if err != nil {
+		log.Error("grpc error: ", err)
 		return nil, err
 	}
 	defer grpcConn.Close()
@@ -301,6 +307,7 @@ func (w *Wallet) ProcessMsgQueue() {
 
 	tx, err := w.CreateAndSignTx(msgs)
 	if err != nil {
+		log.Error("create ang sign tx err: ", err)
 		for _, item := range items {
 			w.EnqueueMsgResponse(item, &sdktypes.TxResponse{}, err)
 		}
@@ -308,7 +315,7 @@ func (w *Wallet) ProcessMsgQueue() {
 	}
 
 	var responseErr error
-	response, err := w.BroadcastTx(tx, BroadcastModeBlock, items)
+	response, err := w.BroadcastTx(tx, BroadcastModeSync, items)
 	if err != nil {
 		responseErr = err
 	}

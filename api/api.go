@@ -4,8 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
 	"github.com/cosmos/cosmos-sdk/client"
-	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
+	"github.com/cosmos/cosmos-sdk/client/grpc/cmtservice"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	log "github.com/sirupsen/logrus"
 )
@@ -56,10 +57,10 @@ func GetChainID(targetGRPCAddress string, clientCtx client.Context) (chainID str
 	defer grpcConn.Close()
 	log.Info("Getting Node Info")
 
-	serviceClient := tmservice.NewServiceClient(grpcConn)
+	serviceClient := cmtservice.NewServiceClient(grpcConn)
 	nodeInfoRes, err := serviceClient.GetNodeInfo(
 		context.Background(),
-		&tmservice.GetNodeInfoRequest{},
+		&cmtservice.GetNodeInfoRequest{},
 	)
 	if err != nil {
 		log.Error(err)
@@ -78,16 +79,16 @@ func GetLatestBlockHeight(targetGRPCAddress string, clientCtx client.Context) (h
 	}
 	defer grpcConn.Close()
 
-	serviceClient := tmservice.NewServiceClient(grpcConn)
+	serviceClient := cmtservice.NewServiceClient(grpcConn)
 	lastestBlockRes, err := serviceClient.GetLatestBlock(
 		context.Background(),
-		&tmservice.GetLatestBlockRequest{},
+		&cmtservice.GetLatestBlockRequest{},
 	)
-	height = lastestBlockRes.Block.Header.Height
 	if err != nil {
 		log.Error(err)
 		return 0, err
 	}
+	height = lastestBlockRes.SdkBlock.Header.Height
 	if height <= 0 {
 		err = errors.New(fmt.Sprintf("get latest block height is invalid: %+v\n", height))
 		log.Error(err)
